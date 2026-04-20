@@ -1,0 +1,278 @@
+/* Questionnaire.css */
+
+.q-root {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 3px auto 1fr auto;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+.q-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 0 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.q-logo {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.q-step-label {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ── Progress ─────────────────────────────────────────── */
+.q-progress-track {
+  background: var(--border);
+  height: 3px;
+}
+
+.q-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Section header ───────────────────────────────────── */
+.q-section-header {
+  padding: 36px 0 8px;
+}
+
+.q-section-title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 5vw, 42px);
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.1;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.q-section-sub {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── Main form area ───────────────────────────────────── */
+.q-main {
+  padding: 32px 0 24px;
+  animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.q-main[data-dir="back"] {
+  animation: slideInBack 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInBack {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+.q-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0 36px;
+  border-top: 1px solid var(--border);
+}
+
+.q-dots {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.q-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border2);
+  transition: all 0.2s;
+}
+
+.q-dot.active {
+  background: var(--accent);
+  width: 18px;
+  border-radius: 3px;
+}
+
+.q-dot.done {
+  background: var(--accent2);
+  opacity: 0.5;
+}
+
+/* ── Shared form field styles ──────────────────────────── */
+.field {
+  margin-bottom: 24px;
+}
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+  opacity: 0.7;
+}
+
+.field-error {
+  font-size: 11px;
+  color: var(--danger);
+  margin-top: 5px;
+}
+
+/* Text / Number inputs */
+.q-input {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 15px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+  appearance: textfield;
+}
+
+.q-input:focus { border-color: var(--accent); }
+.q-input.error  { border-color: var(--danger); }
+.q-input::placeholder { color: var(--muted); }
+
+/* Input with suffix (e.g. "cm", "kg") */
+.input-suffix-wrap {
+  position: relative;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* Currency + budget row */
+.budget-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+}
+
+.q-select {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 12px 14px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237a7870'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 34px;
+}
+
+.q-select:focus { border-color: var(--accent); }
+.q-select option { background: var(--bg2); }
+
+/* Two-column grid */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* Radio / pill button group */
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill-label {
+  cursor: pointer;
+}
+
+.pill-label input[type="radio"],
+.pill-label input[type="checkbox"] {
+  display: none;
+}
+
+.pill-btn {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.pill-label input:checked + .pill-btn {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(184, 255, 87, 0.06);
+}
+
+.pill-btn:hover { border-color: var(--muted); color: var(--text); }
+
+/* Range slider */
+.q-range {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 4px;
+  margin: 8px 0;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Divider between field groups */
+.field-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 28px 0;
+}

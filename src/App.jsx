@@ -1,32 +1,45 @@
-// fetch('http://localhost:8000/health')
-//    .then(r => r.json())
-//    .then(d => console.log(d))
+// src/App.jsx
+import { useState } from "react";
+import Questionnaire from "./components/Questionnaire/Questionnaire";
+import PlanResult from "./components/PlanResult";
+import "./App.css";
 
-import { useEffect, useState } from 'react'
+export default function App() {
+  const [phase, setPhase] = useState("questionnaire"); // "questionnaire" | "loading" | "result"
+  const [planData, setPlanData] = useState(null);
 
-function App() {
-  const [healthStatus, setHealthStatus] = useState("Connecting to backend...")
-
-  useEffect(() => {
-    // This is the connection to your FastAPI server
-    fetch('http://localhost:8000/health')
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("Backend says:", data)
-        setHealthStatus(data.healthy ? "Backend is Healthy! ✅" : "Backend issue ❌")
-      })
-      .catch((error) => {
-        console.error("Error:", error)
-        setHealthStatus("Cannot reach backend. Is the Python server running? ❌")
-      })
-  }, [])
+  const handleSubmit = async (formData) => {
+    setPhase("loading");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/profile/build`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error("Profile build failed");
+      const profile = await res.json();
+      setPlanData(profile);
+      setPhase("result");
+    } catch (err) {
+      alert("Something went wrong: " + err.message);
+      setPhase("questionnaire");
+    }
+  };
 
   return (
-    <div style={{ padding: '40px', textAlign: 'center', fontFamily: 'sans-serif' }}>
-      <h1>FitAI Dashboard</h1>
-      <p>Status: <strong>{healthStatus}</strong></p>
+    <div className="app-root">
+      {phase === "questionnaire" && <Questionnaire onSubmit={handleSubmit} />}
+      {phase === "loading" && <LoadingScreen />}
+      {phase === "result" && <PlanResult profile={planData} onReset={() => setPhase("questionnaire")} />}
     </div>
-  )
+  );
 }
 
-export default App
+function LoadingScreen() {
+  return (
+    <div className="loading-screen">
+      <div className="loading-pulse" />
+      <p className="loading-text">Analysing your profile & retrieving research…</p>
+    </div>
+  );
+}
