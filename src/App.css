@@ -7,7 +7,7 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+/* :root {
   --bg:       #0e0e0e;
   --bg2:      #161616;
   --bg3:      #1e1e1e;
@@ -21,6 +21,39 @@
   --mono:     'DM Mono', monospace;
   --serif:    'Fraunces', serif;
   --radius:   4px;
+  --radius-lg: 10px;
+} */
+
+:root {
+  --bg:        #0e0e0e;
+  --bg2:       #161616;
+  --bg3:       #1e1e1e;
+  --border:    #2a2a2a;
+  --border2:   #383838;
+  --text:      #e8e4dc;
+  --muted:     #7a7870;
+
+  /* Pinterest palette */
+  --amber:     #d47625;   /* warm orange */
+  --peach:     #fcc4ac;   /* soft peach */
+  --slate:     #456699;   /* muted blue */
+  --teal:      #6a9da7;   /* dusty teal */
+  --sand:      #c5b7b0;   /* warm sand */
+  --plum:      #3a2d40;   /* deep purple */
+
+  /* Semantic mappings — replaces accent/accent2 */
+  --accent:    #d47625;   /* amber — primary CTA */
+  --accent2:   #6a9da7;   /* teal — secondary highlight */
+  --accent3:   #456699;   /* slate — links, info */
+  --subtle:    #c5b7b0;   /* sand — borders, tags */
+  --danger:    #ff5757;   /* unchanged */
+  --success:   #6a9da7;   /* teal doubles as success */
+  --warning:   #fcc4ac;   /* peach for warnings */
+  --deep:      #3a2d40;   /* plum — dark surfaces */
+
+  --mono:      'DM Mono', monospace;
+  --serif:     'Fraunces', serif;
+  --radius:    4px;
   --radius-lg: 10px;
 }
 

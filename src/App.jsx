@@ -2,11 +2,13 @@
 import { useState } from "react";
 import Questionnaire from "./components/Questionnaire/Questionnaire";
 import PlanResult from "./components/PlanResult";
+import PlanDisplay from "./components/PlanDisplay";   // Stage 5 — create this next
 import "./App.css";
 
 export default function App() {
-  const [phase, setPhase] = useState("questionnaire"); // "questionnaire" | "loading" | "result"
+  const [phase, setPhase]     = useState("questionnaire"); // "questionnaire" | "loading" | "result" | "plan" | "generating"
   const [planData, setPlanData] = useState(null);
+  const [plan, setPlan]         = useState(null);
 
   const handleSubmit = async (formData) => {
     setPhase("loading");
@@ -26,20 +28,45 @@ export default function App() {
     }
   };
 
+  const handleGeneratePlan = async (generatedPlan) => {
+    setPlan(generatedPlan);
+    setPhase("plan");
+  };
+
   return (
     <div className="app-root">
-      {phase === "questionnaire" && <Questionnaire onSubmit={handleSubmit} />}
-      {phase === "loading" && <LoadingScreen />}
-      {phase === "result" && <PlanResult profile={planData} onReset={() => setPhase("questionnaire")} />}
+      {phase === "questionnaire" && (
+        <Questionnaire onSubmit={handleSubmit} />
+      )}
+      {phase === "loading" && (
+        <LoadingScreen message="Analysing your profile & retrieving research…" />
+      )}
+      {phase === "result" && (
+        <PlanResult
+          profile={planData}
+          onReset={() => setPhase("questionnaire")}
+          onPlanGenerated={handleGeneratePlan}
+        />
+      )}
+      {phase === "generating" && (
+        <LoadingScreen message="Generating your personalised plan from research papers…" />
+      )}
+      {phase === "plan" && (
+        <PlanDisplay
+          plan={plan}
+          profile={planData}
+          onReset={() => setPhase("questionnaire")}
+        />
+      )}
     </div>
   );
 }
 
-function LoadingScreen() {
+function LoadingScreen({ message }) {
   return (
     <div className="loading-screen">
       <div className="loading-pulse" />
-      <p className="loading-text">Analysing your profile & retrieving research…</p>
+      <p className="loading-text">{message}</p>
     </div>
   );
 }
