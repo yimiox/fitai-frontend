@@ -561,3 +561,14 @@
   .pd-disclaimer { margin: 24px 20px 0; }
   .pd-header  { padding: 16px 20px; }
 }
+
+/* Error state for adjustment input */
+.pd-adjust-input.pd-input-error {
+  border-color: var(--danger);
+  outline: none;
+}
+ 
+.pd-adjust-input.pd-input-error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(255, 87, 87, 0.15);
+}
