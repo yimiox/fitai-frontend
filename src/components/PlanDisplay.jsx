@@ -1,7 +1,7 @@
 // src/components/PlanDisplay.jsx
-// Updated: agent reasoning shown in Citations tab
+// Upgrade 3 — Chat thread UI with conversation memory
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./PlanDisplay.css";
 
 const INJECTION_PATTERNS = [
@@ -11,48 +11,62 @@ const INJECTION_PATTERNS = [
 ];
 
 function containsInjection(text) {
-  const lower = text.toLowerCase();
-  return INJECTION_PATTERNS.some(p => lower.includes(p));
+  return INJECTION_PATTERNS.some(p => text.toLowerCase().includes(p));
 }
 
 export default function PlanDisplay({ plan, profile, onReset }) {
   const [tab, setTab]                = useState("workout");
   const [openDay, setOpenDay]        = useState(0);
   const [openMeal, setOpenMeal]      = useState(null);
-  const [adjustment, setAdjustment]  = useState("");
-  const [adjusting, setAdjusting]    = useState(false);
-  const [adjustError, setAdjustError] = useState(null);
-  const [inputError, setInputError]  = useState(null);
   const [currentPlan, setCurrentPlan] = useState(plan);
+  const [messages, setMessages]      = useState(plan.conversation ?? []);
+  const [input, setInput]            = useState("");
+  const [sending, setSending]        = useState(false);
+  const [inputError, setInputError]  = useState(null);
+  const [sendError, setSendError]    = useState(null);
+  const chatBottomRef                = useRef(null);
+
+  // Auto-scroll chat to bottom when messages change
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
 
   if (!currentPlan) return null;
 
-  const wp          = currentPlan.workout_plan    ?? {};
-  const dp          = currentPlan.diet_plan       ?? {};
-  const citations   = currentPlan.citations       ?? [];
-  const reasoning   = currentPlan.agent_reasoning ?? [];
-  const stats       = currentPlan.retrieval_stats ?? {};
-  const schedule    = wp.weekly_schedule          ?? [];
-  const mealPlan    = dp.meal_plan                ?? [];
+  const wp        = currentPlan.workout_plan    ?? {};
+  const dp        = currentPlan.diet_plan       ?? {};
+  const citations = currentPlan.citations       ?? [];
+  const reasoning = currentPlan.agent_reasoning ?? [];
+  const stats     = currentPlan.retrieval_stats ?? {};
+  const schedule  = wp.weekly_schedule          ?? [];
+  const mealPlan  = dp.meal_plan                ?? [];
 
-  const handleAdjustmentChange = (e) => {
+  const handleInputChange = (e) => {
     const val = e.target.value;
-    setAdjustment(val);
+    setInput(val);
     if (val.length > 10 && containsInjection(val)) {
-      setInputError("Please describe a fitness change, not an instruction override.");
+      setInputError("Please describe a fitness change for your plan.");
     } else {
       setInputError(null);
     }
   };
 
-  const handleAdjust = async () => {
-    if (!adjustment.trim() || inputError) return;
-    if (containsInjection(adjustment)) {
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || inputError || sending) return;
+
+    if (containsInjection(text)) {
       setInputError("Please enter a valid fitness adjustment.");
       return;
     }
-    setAdjusting(true);
-    setAdjustError(null);
+
+    // Optimistically add user message to chat
+    const userMsg = { role: "user", message: text };
+    setMessages(prev => [...prev, userMsg]);
+    setInput("");
+    setSending(true);
+    setSendError(null);
+
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/adjust-plan`, {
         method: "POST",
@@ -60,28 +74,36 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         body: JSON.stringify({
           user_id:    profile.profile_id,
           plan_id:    currentPlan.plan_id,
-          adjustment,
+          adjustment: text,
         }),
       });
+
       if (!res.ok) {
         const err = await res.json();
-        if (res.status === 400) throw new Error("That adjustment isn't allowed. Please describe a fitness change.");
+        if (res.status === 400) throw new Error("That adjustment isn't allowed.");
         throw new Error(JSON.stringify(err.detail));
       }
+
       const updated = await res.json();
+
+      // Update plan and conversation
       setCurrentPlan(updated);
-      setAdjustment("");
+      setMessages(updated.conversation ?? [...messages, userMsg]);
       setOpenDay(0);
+
     } catch (err) {
-      setAdjustError(err.message);
+      setSendError(err.message);
+      // Remove optimistic user message on failure
+      setMessages(prev => prev.filter(m => m !== userMsg));
     } finally {
-      setAdjusting(false);
+      setSending(false);
     }
   };
 
   return (
     <div className="pd-root">
 
+      {/* ── HEADER ── */}
       <header className="pd-header">
         <span className="pd-logo">FITAI</span>
         <div className="pd-header-right">
@@ -90,38 +112,38 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       </header>
 
+      {/* ── HERO ── */}
       <div className="pd-hero">
-        <p className="pd-eyebrow">Evidence-based · Research-backed · AI-powered retrieval</p>
+        <p className="pd-eyebrow">Evidence-based · Research-backed · AI-powered</p>
         <h1 className="pd-title">Your personalised plan</h1>
         <div className="pd-stats">
           <Stat label="Training days"  value={`${wp.weekly_frequency ?? schedule.length}× / week`} />
           <Stat label="Daily calories" value={`${dp.daily_calories ?? "—"} kcal`} />
           <Stat label="Protein target" value={`${dp.macros?.protein_g ?? "—"}g / day`} />
           <Stat label="Papers cited"   value={`${citations.length} sources`} />
-          {stats.tool_calls > 0 && (
-            <Stat label="Agent searches" value={`${stats.tool_calls} queries`} />
-          )}
-          {stats.avg_similarity > 0 && (
-            <Stat label="Avg relevance" value={`${Math.round(stats.avg_similarity * 100)}%`} />
-          )}
+          {stats.tool_calls > 0 && <Stat label="Agent searches" value={`${stats.tool_calls} queries`} />}
         </div>
       </div>
 
+      {/* ── TABS ── */}
       <div className="pd-tabs">
-        {["workout", "diet", "citations"].map(t => (
+        {["workout", "diet", "chat", "citations"].map(t => (
           <button
             key={t}
             className={`pd-tab ${tab === t ? "active" : ""}`}
             onClick={() => setTab(t)}
           >
-            {t === "workout" ? "Workout plan"
-             : t === "diet"  ? "Diet plan"
-             : `Research${reasoning.length > 0 ? " + AI reasoning" : ""}`}
+            {t === "workout"   ? "Workout"
+             : t === "diet"    ? "Diet"
+             : t === "chat"    ? `Chat${messages.length > 0 ? ` (${messages.length})` : ""}`
+             : "Research"}
           </button>
         ))}
       </div>
 
-      {/* ── WORKOUT TAB ── */}
+      {/* ══════════════════════════════
+          TAB: WORKOUT
+      ══════════════════════════════ */}
       {tab === "workout" && (
         <div className="pd-section">
           {wp.progressive_overload_note && (
@@ -156,7 +178,8 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                             <span className="pd-tag">{ex.reps} reps</span>
                             <span className="pd-tag">{ex.rest_secs}s rest</span>
                             {ex.citation_id && (
-                              <span className="pd-tag pd-tag-cite" title={getCitationText(citations, ex.citation_id)}>
+                              <span className="pd-tag pd-tag-cite"
+                                title={getCitationText(citations, ex.citation_id)}>
                                 {ex.citation_id}
                               </span>
                             )}
@@ -173,7 +196,9 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       )}
 
-      {/* ── DIET TAB ── */}
+      {/* ══════════════════════════════
+          TAB: DIET
+      ══════════════════════════════ */}
       {tab === "diet" && (
         <div className="pd-section">
           <div className="pd-macros">
@@ -233,11 +258,108 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       )}
 
-      {/* ── CITATIONS + AGENT REASONING TAB ── */}
+      {/* ══════════════════════════════
+          TAB: CHAT  ← NEW
+      ══════════════════════════════ */}
+      {tab === "chat" && (
+        <div className="pd-section">
+          <div className="pd-chat">
+
+            {/* Empty state */}
+            {messages.length === 0 && (
+              <div className="pd-chat-empty">
+                <p>Ask me to adjust anything about your plan.</p>
+                <p style={{ fontSize: 12, marginTop: 6 }}>
+                  I'll remember everything you've asked across this conversation.
+                </p>
+              </div>
+            )}
+
+            {/* Message thread */}
+            <div className="pd-chat-messages">
+              {messages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`pd-chat-msg ${msg.role === "user" ? "pd-msg-user" : "pd-msg-ai"}`}
+                >
+                  <div className="pd-msg-role">
+                    {msg.role === "user" ? "You" : "FitAI"}
+                  </div>
+                  <div className="pd-msg-text">{msg.message}</div>
+                </div>
+              ))}
+
+              {/* Thinking indicator */}
+              {sending && (
+                <div className="pd-chat-msg pd-msg-ai">
+                  <div className="pd-msg-role">FitAI</div>
+                  <div className="pd-msg-text pd-thinking">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Quick chips */}
+            <div className="pd-chips" style={{ marginBottom: 12 }}>
+              {[
+                "No dumbbells, bodyweight only",
+                "Make the diet cheaper",
+                "Shorter sessions — 30 mins max",
+                "Add more protein",
+                "Remove leg exercises",
+              ].map(chip => (
+                <button
+                  key={chip}
+                  className="pd-chip"
+                  onClick={() => { setInput(chip); setInputError(null); }}
+                  disabled={sending}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {/* Input row */}
+            <div className="pd-chat-input-row">
+              <div style={{ flex: 1 }}>
+                <input
+                  className={`pd-adjust-input ${inputError ? "pd-input-error" : ""}`}
+                  placeholder="e.g. Remove all leg exercises, I have a knee injury"
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={e => e.key === "Enter" && !inputError && handleSend()}
+                  disabled={sending}
+                />
+                {inputError && (
+                  <p style={{ color: "var(--danger)", fontSize: 11, marginTop: 4 }}>{inputError}</p>
+                )}
+              </div>
+              <button
+                className="pd-adjust-btn"
+                onClick={handleSend}
+                disabled={sending || !input.trim() || !!inputError}
+              >
+                {sending ? "Thinking…" : "Send"}
+              </button>
+            </div>
+
+            {sendError && (
+              <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{sendError}</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════
+          TAB: CITATIONS + REASONING
+      ══════════════════════════════ */}
       {tab === "citations" && (
         <div className="pd-section">
-
-          {/* Agent reasoning block */}
           {reasoning.length > 0 && (
             <div className="pd-reasoning">
               <h3 className="pd-reasoning-title">
@@ -245,7 +367,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                 <span className="pd-reasoning-badge">{reasoning.length} decisions</span>
               </h3>
               <p className="pd-reasoning-sub">
-                How the agent searched for your evidence — automatically adapted based on your profile.
+                How the agent searched for your evidence.
               </p>
               <div className="pd-reasoning-steps">
                 {reasoning.map((step, i) => (
@@ -257,81 +379,33 @@ export default function PlanDisplay({ plan, profile, onReset }) {
               </div>
               {stats.avg_similarity > 0 && (
                 <div className="pd-reasoning-footer">
-                  Average evidence relevance: <strong>{Math.round(stats.avg_similarity * 100)}%</strong>
-                  &nbsp;·&nbsp; Chunks used: <strong>{stats.chunks_used}</strong>
+                  Avg relevance: <strong>{Math.round(stats.avg_similarity * 100)}%</strong>
+                  &nbsp;·&nbsp; Chunks: <strong>{stats.chunks_used}</strong>
                 </div>
               )}
             </div>
           )}
 
-          {/* Citations */}
           <h3 className="pd-section-subtitle">Research citations</h3>
-          {citations.length === 0 ? (
-            <p style={{ color: "var(--muted)", fontSize: 14 }}>No citations available.</p>
-          ) : (
-            <div className="pd-citations">
-              {citations.map((c, i) => (
-                <div key={i} className="pd-citation">
-                  <div className="pd-cite-id">{c.citation_id}</div>
-                  <div className="pd-cite-body">
-                    <p className="pd-cite-title">{c.paper_title}</p>
-                    {c.relevant_finding && <p className="pd-cite-finding">"{c.relevant_finding}"</p>}
-                    {c.chunk_text && !c.relevant_finding && (
-                      <p className="pd-cite-finding">"{c.chunk_text.slice(0, 280)}..."</p>
-                    )}
-                    {c.similarity && (
-                      <p className="pd-cite-sim">Relevance: {Math.round(c.similarity * 100)}%</p>
-                    )}
-                  </div>
+          <div className="pd-citations">
+            {citations.map((c, i) => (
+              <div key={i} className="pd-citation">
+                <div className="pd-cite-id">{c.citation_id}</div>
+                <div className="pd-cite-body">
+                  <p className="pd-cite-title">{c.paper_title}</p>
+                  {c.relevant_finding && <p className="pd-cite-finding">"{c.relevant_finding}"</p>}
+                  {c.chunk_text && !c.relevant_finding && (
+                    <p className="pd-cite-finding">"{c.chunk_text.slice(0, 280)}..."</p>
+                  )}
+                  {c.similarity && (
+                    <p className="pd-cite-sim">Relevance: {Math.round(c.similarity * 100)}%</p>
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
-
-      {/* ── ADJUST PLAN ── */}
-      <div className="pd-adjust">
-        <h3 className="pd-adjust-title">Adjust your plan</h3>
-        <p className="pd-adjust-sub">
-          Tell us what to change — the agent will re-search and regenerate automatically.
-        </p>
-        <div className="pd-adjust-row">
-          <div style={{ flex: 1 }}>
-            <input
-              className={`pd-adjust-input ${inputError ? "pd-input-error" : ""}`}
-              placeholder="e.g. I don't have dumbbells, use bodyweight only"
-              value={adjustment}
-              onChange={handleAdjustmentChange}
-              onKeyDown={e => e.key === "Enter" && !inputError && handleAdjust()}
-              disabled={adjusting}
-            />
-            {inputError && (
-              <p style={{ color: "var(--danger)", fontSize: 11, marginTop: 5 }}>{inputError}</p>
-            )}
-          </div>
-          <button
-            className="pd-adjust-btn"
-            onClick={handleAdjust}
-            disabled={adjusting || !adjustment.trim() || !!inputError}
-          >
-            {adjusting ? "Agent searching…" : "Update plan"}
-          </button>
-        </div>
-        {adjustError && (
-          <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{adjustError}</p>
-        )}
-        <div className="pd-chips">
-          {["No dumbbells, bodyweight only", "Make the diet cheaper",
-            "Shorter sessions — 30 mins max", "Add more protein", "Remove leg exercises"
-          ].map(chip => (
-            <button key={chip} className="pd-chip"
-              onClick={() => { setAdjustment(chip); setInputError(null); }}>
-              {chip}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {currentPlan.safety_disclaimer && (
         <div className="pd-disclaimer">⚠ {currentPlan.safety_disclaimer}</div>
