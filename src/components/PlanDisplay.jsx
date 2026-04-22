@@ -1,31 +1,19 @@
 // src/components/PlanDisplay.jsx
-// Phase 5 — Full plan results UI
-// Includes client-side injection defence on the adjustment input
+// Updated: agent reasoning shown in Citations tab
 
 import { useState } from "react";
 import "./PlanDisplay.css";
 
-// ── INJECTION KEYWORDS (mirrors backend list) ──────────────────────
 const INJECTION_PATTERNS = [
   "ignore previous", "ignore all previous", "ignore instructions",
-  "forget everything", "forget your instructions",
-  "you are now", "you are no longer",
-  "act as", "pretend you", "pretend to be",
-  "roleplay as", "imagine you are",
-  "new persona", "new instructions",
-  "disregard", "bypass", "jailbreak",
-  "dan mode", "developer mode", "unrestricted mode",
-  "no restrictions", "reveal your prompt",
-  "show your instructions", "what is your system prompt",
-  "ignore your training", "override",
-  "you have no rules", "you can do anything",
+  "forget everything", "you are now", "act as", "pretend you",
+  "jailbreak", "dan mode", "bypass", "override", "no restrictions",
 ];
 
 function containsInjection(text) {
   const lower = text.toLowerCase();
   return INJECTION_PATTERNS.some(p => lower.includes(p));
 }
-// ───────────────────────────────────────────────────────────────────
 
 export default function PlanDisplay({ plan, profile, onReset }) {
   const [tab, setTab]                = useState("workout");
@@ -34,40 +22,37 @@ export default function PlanDisplay({ plan, profile, onReset }) {
   const [adjustment, setAdjustment]  = useState("");
   const [adjusting, setAdjusting]    = useState(false);
   const [adjustError, setAdjustError] = useState(null);
-  const [inputError, setInputError]  = useState(null);   // client-side injection error
+  const [inputError, setInputError]  = useState(null);
   const [currentPlan, setCurrentPlan] = useState(plan);
 
   if (!currentPlan) return null;
 
-  const wp       = currentPlan.workout_plan  ?? {};
-  const dp       = currentPlan.diet_plan     ?? {};
-  const citations = currentPlan.citations    ?? [];
-  const schedule  = wp.weekly_schedule       ?? [];
-  const mealPlan  = dp.meal_plan             ?? [];
+  const wp          = currentPlan.workout_plan    ?? {};
+  const dp          = currentPlan.diet_plan       ?? {};
+  const citations   = currentPlan.citations       ?? [];
+  const reasoning   = currentPlan.agent_reasoning ?? [];
+  const stats       = currentPlan.retrieval_stats ?? {};
+  const schedule    = wp.weekly_schedule          ?? [];
+  const mealPlan    = dp.meal_plan                ?? [];
 
   const handleAdjustmentChange = (e) => {
     const val = e.target.value;
     setAdjustment(val);
-    // Real-time injection check
     if (val.length > 10 && containsInjection(val)) {
-      setInputError("That doesn't look like a fitness adjustment. Please describe what you'd like to change about your plan.");
+      setInputError("Please describe a fitness change, not an instruction override.");
     } else {
       setInputError(null);
     }
   };
 
   const handleAdjust = async () => {
-    if (!adjustment.trim()) return;
-
-    // Client-side guard — block before even hitting the network
+    if (!adjustment.trim() || inputError) return;
     if (containsInjection(adjustment)) {
-      setInputError("Please enter a valid fitness adjustment (e.g. 'remove leg exercises' or 'make the diet cheaper').");
+      setInputError("Please enter a valid fitness adjustment.");
       return;
     }
-
     setAdjusting(true);
     setAdjustError(null);
-
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/adjust-plan`, {
         method: "POST",
@@ -78,24 +63,15 @@ export default function PlanDisplay({ plan, profile, onReset }) {
           adjustment,
         }),
       });
-
       if (!res.ok) {
         const err = await res.json();
-        // Surface injection errors distinctly
-        if (res.status === 400) {
-          throw new Error("That adjustment isn't allowed. Please describe a fitness change.");
-        }
-        const detail = Array.isArray(err.detail)
-          ? err.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join(", ")
-          : JSON.stringify(err.detail);
-        throw new Error(detail);
+        if (res.status === 400) throw new Error("That adjustment isn't allowed. Please describe a fitness change.");
+        throw new Error(JSON.stringify(err.detail));
       }
-
       const updated = await res.json();
       setCurrentPlan(updated);
       setAdjustment("");
       setOpenDay(0);
-
     } catch (err) {
       setAdjustError(err.message);
     } finally {
@@ -106,7 +82,6 @@ export default function PlanDisplay({ plan, profile, onReset }) {
   return (
     <div className="pd-root">
 
-      {/* ── HEADER ── */}
       <header className="pd-header">
         <span className="pd-logo">FITAI</span>
         <div className="pd-header-right">
@@ -115,19 +90,23 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       </header>
 
-      {/* ── HERO ── */}
       <div className="pd-hero">
-        <p className="pd-eyebrow">Evidence-based · Research-backed</p>
+        <p className="pd-eyebrow">Evidence-based · Research-backed · AI-powered retrieval</p>
         <h1 className="pd-title">Your personalised plan</h1>
         <div className="pd-stats">
           <Stat label="Training days"  value={`${wp.weekly_frequency ?? schedule.length}× / week`} />
           <Stat label="Daily calories" value={`${dp.daily_calories ?? "—"} kcal`} />
           <Stat label="Protein target" value={`${dp.macros?.protein_g ?? "—"}g / day`} />
-          <Stat label="Citations"      value={`${citations.length} papers`} />
+          <Stat label="Papers cited"   value={`${citations.length} sources`} />
+          {stats.tool_calls > 0 && (
+            <Stat label="Agent searches" value={`${stats.tool_calls} queries`} />
+          )}
+          {stats.avg_similarity > 0 && (
+            <Stat label="Avg relevance" value={`${Math.round(stats.avg_similarity * 100)}%`} />
+          )}
         </div>
       </div>
 
-      {/* ── TABS ── */}
       <div className="pd-tabs">
         {["workout", "diet", "citations"].map(t => (
           <button
@@ -135,14 +114,14 @@ export default function PlanDisplay({ plan, profile, onReset }) {
             className={`pd-tab ${tab === t ? "active" : ""}`}
             onClick={() => setTab(t)}
           >
-            {t === "workout" ? "Workout plan" : t === "diet" ? "Diet plan" : "Research"}
+            {t === "workout" ? "Workout plan"
+             : t === "diet"  ? "Diet plan"
+             : `Research${reasoning.length > 0 ? " + AI reasoning" : ""}`}
           </button>
         ))}
       </div>
 
-      {/* ══════════════════════════════
-          TAB: WORKOUT
-      ══════════════════════════════ */}
+      {/* ── WORKOUT TAB ── */}
       {tab === "workout" && (
         <div className="pd-section">
           {wp.progressive_overload_note && (
@@ -183,9 +162,6 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                             )}
                           </div>
                           {ex.notes && <p className="pd-ex-note">{ex.notes}</p>}
-                          {ex.citation_warning && (
-                            <p className="pd-ex-note" style={{ color: "var(--peach)" }}>⚠ {ex.citation_warning}</p>
-                          )}
                         </div>
                       </div>
                     ))}
@@ -197,9 +173,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       )}
 
-      {/* ══════════════════════════════
-          TAB: DIET
-      ══════════════════════════════ */}
+      {/* ── DIET TAB ── */}
       {tab === "diet" && (
         <div className="pd-section">
           <div className="pd-macros">
@@ -218,7 +192,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                   </div>
                   <div className="pd-day-right">
                     <span className="pd-day-meta">
-                      {dayObj.meals?.reduce((sum, m) => sum + (m.calories ?? 0), 0)} kcal
+                      {dayObj.meals?.reduce((s, m) => s + (m.calories ?? 0), 0)} kcal
                     </span>
                     <span className="pd-chevron">{openMeal === i ? "−" : "+"}</span>
                   </div>
@@ -235,13 +209,9 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                             <span className="pd-tag">{meal.protein_g}g protein</span>
                             <span className="pd-tag pd-tag-budget">{meal.estimated_cost} cost</span>
                             <span className="pd-tag">{meal.prep_time_mins} min prep</span>
-                            {meal.citation_id && (
-                              <span className="pd-tag pd-tag-cite">{meal.citation_id}</span>
-                            )}
+                            {meal.citation_id && <span className="pd-tag pd-tag-cite">{meal.citation_id}</span>}
                           </div>
-                          {meal.ingredients && (
-                            <p className="pd-ex-note">{meal.ingredients.join(" · ")}</p>
-                          )}
+                          {meal.ingredients && <p className="pd-ex-note">{meal.ingredients.join(" · ")}</p>}
                         </div>
                       </div>
                     ))}
@@ -263,11 +233,39 @@ export default function PlanDisplay({ plan, profile, onReset }) {
         </div>
       )}
 
-      {/* ══════════════════════════════
-          TAB: CITATIONS
-      ══════════════════════════════ */}
+      {/* ── CITATIONS + AGENT REASONING TAB ── */}
       {tab === "citations" && (
         <div className="pd-section">
+
+          {/* Agent reasoning block */}
+          {reasoning.length > 0 && (
+            <div className="pd-reasoning">
+              <h3 className="pd-reasoning-title">
+                AI agent reasoning
+                <span className="pd-reasoning-badge">{reasoning.length} decisions</span>
+              </h3>
+              <p className="pd-reasoning-sub">
+                How the agent searched for your evidence — automatically adapted based on your profile.
+              </p>
+              <div className="pd-reasoning-steps">
+                {reasoning.map((step, i) => (
+                  <div key={i} className="pd-reasoning-step">
+                    <div className="pd-reasoning-num">{i + 1}</div>
+                    <p className="pd-reasoning-text">{step}</p>
+                  </div>
+                ))}
+              </div>
+              {stats.avg_similarity > 0 && (
+                <div className="pd-reasoning-footer">
+                  Average evidence relevance: <strong>{Math.round(stats.avg_similarity * 100)}%</strong>
+                  &nbsp;·&nbsp; Chunks used: <strong>{stats.chunks_used}</strong>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Citations */}
+          <h3 className="pd-section-subtitle">Research citations</h3>
           {citations.length === 0 ? (
             <p style={{ color: "var(--muted)", fontSize: 14 }}>No citations available.</p>
           ) : (
@@ -277,11 +275,12 @@ export default function PlanDisplay({ plan, profile, onReset }) {
                   <div className="pd-cite-id">{c.citation_id}</div>
                   <div className="pd-cite-body">
                     <p className="pd-cite-title">{c.paper_title}</p>
-                    {c.relevant_finding && (
-                      <p className="pd-cite-finding">"{c.relevant_finding}"</p>
-                    )}
+                    {c.relevant_finding && <p className="pd-cite-finding">"{c.relevant_finding}"</p>}
                     {c.chunk_text && !c.relevant_finding && (
                       <p className="pd-cite-finding">"{c.chunk_text.slice(0, 280)}..."</p>
+                    )}
+                    {c.similarity && (
+                      <p className="pd-cite-sim">Relevance: {Math.round(c.similarity * 100)}%</p>
                     )}
                   </div>
                 </div>
@@ -295,7 +294,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
       <div className="pd-adjust">
         <h3 className="pd-adjust-title">Adjust your plan</h3>
         <p className="pd-adjust-sub">
-          Tell us what to change — no dumbbells, tighter budget, injured knee — and we'll regenerate.
+          Tell us what to change — the agent will re-search and regenerate automatically.
         </p>
         <div className="pd-adjust-row">
           <div style={{ flex: 1 }}>
@@ -308,9 +307,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
               disabled={adjusting}
             />
             {inputError && (
-              <p style={{ color: "var(--danger)", fontSize: 11, marginTop: 5, lineHeight: 1.4 }}>
-                {inputError}
-              </p>
+              <p style={{ color: "var(--danger)", fontSize: 11, marginTop: 5 }}>{inputError}</p>
             )}
           </div>
           <button
@@ -318,27 +315,18 @@ export default function PlanDisplay({ plan, profile, onReset }) {
             onClick={handleAdjust}
             disabled={adjusting || !adjustment.trim() || !!inputError}
           >
-            {adjusting ? "Updating…" : "Update plan"}
+            {adjusting ? "Agent searching…" : "Update plan"}
           </button>
         </div>
-
         {adjustError && (
           <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 8 }}>{adjustError}</p>
         )}
-
         <div className="pd-chips">
-          {[
-            "No dumbbells, bodyweight only",
-            "Make the diet cheaper",
-            "Shorter sessions — 30 mins max",
-            "Add more protein",
-            "Remove leg exercises",
+          {["No dumbbells, bodyweight only", "Make the diet cheaper",
+            "Shorter sessions — 30 mins max", "Add more protein", "Remove leg exercises"
           ].map(chip => (
-            <button
-              key={chip}
-              className="pd-chip"
-              onClick={() => { setAdjustment(chip); setInputError(null); }}
-            >
+            <button key={chip} className="pd-chip"
+              onClick={() => { setAdjustment(chip); setInputError(null); }}>
               {chip}
             </button>
           ))}
@@ -346,9 +334,7 @@ export default function PlanDisplay({ plan, profile, onReset }) {
       </div>
 
       {currentPlan.safety_disclaimer && (
-        <div className="pd-disclaimer">
-          ⚠ {currentPlan.safety_disclaimer}
-        </div>
+        <div className="pd-disclaimer">⚠ {currentPlan.safety_disclaimer}</div>
       )}
     </div>
   );

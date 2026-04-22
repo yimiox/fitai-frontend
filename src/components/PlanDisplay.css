@@ -572,3 +572,107 @@
   border-color: var(--danger);
   box-shadow: 0 0 0 2px rgba(255, 87, 87, 0.15);
 }
+
+/* ── AGENT REASONING ── */
+.pd-reasoning {
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+.pd-reasoning-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-reasoning-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg3);
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  font-weight: 400;
+}
+
+.pd-reasoning-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.pd-reasoning-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-reasoning-step {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.pd-reasoning-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--teal);
+  color: var(--teal);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pd-reasoning-text {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pd-reasoning-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pd-reasoning-footer strong {
+  color: var(--teal);
+}
+
+/* ── CITATIONS SECTION SUBTITLE ── */
+.pd-section-subtitle {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 14px;
+  font-weight: 400;
+}
+
+/* ── CITATION SIMILARITY ── */
+.pd-cite-sim {
+  font-size: 11px;
+  color: var(--teal);
+  margin: 6px 0 0;
+}
+
+/* ── INPUT ERROR STATE ── */
+.pd-adjust-input.pd-input-error {
+  border-color: var(--danger);
+}
