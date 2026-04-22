@@ -2,26 +2,30 @@
 import { useState } from "react";
 import "./PlanResult.css";
 
+// Maps ALL possible questionnaire goal values to the 4 backend accepts
+const GOAL_MAP = {
+  "fat_loss":    "fat_loss",
+  "muscle_gain": "muscle_gain",
+  "endurance":   "endurance",
+  "general":     "general",
+  "recomp":      "recomp",   
+  "strength":    "strength",
+};
+
 export default function PlanResult({ profile, onReset, onPlanGenerated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
 
   if (!profile) return null;
   const p = profile.computed;
+  const r = profile.raw;
 
   const handleGeneratePlan = async () => {
-    console.log("profile object:", profile);      // ← add this line
-    console.log("user_id:", profile.user_id);
-    console.log("full profile keys:", Object.keys(profile));
-    console.log("user_id direct:", profile.user_id);
-    console.log("raw user_id:", profile.raw?.user_id);
-    console.log("computed user_id:", profile.computed?.user_id);
-    console.log("goal value:", profile.raw.primary_goal);
-    // console.log("mapped goal:", goal);  // add inside handleGeneratePlan before the fetch
-    console.log("experience:", profile.raw.experience_level);
-    console.log("raw keys:", Object.keys(profile.raw));
     setLoading(true);
     setError(null);
+
+    const goal = GOAL_MAP[r.primary_goal] ?? "general";
+    console.log("raw primary_goal:", r.primary_goal, "→ mapped goal:", goal);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/generate-plan`, {
@@ -30,40 +34,35 @@ export default function PlanResult({ profile, onReset, onPlanGenerated }) {
         body: JSON.stringify({
           user_id: profile.profile_id,
           profile: {
-            age:       profile.raw.age,
-            sex:       profile.raw.sex,
-            height_cm: profile.raw.height_cm,
-            weight_kg: profile.raw.weight_kg,
+            age:       r.age,
+            sex:       r.sex,
+            height_cm: r.height_cm,
+            weight_kg: r.weight_kg,
             bmi:       p.bmi,
             tdee:      p.tdee,
-            goal:      profile.raw.primary_goal,
-            experience:          profile.raw.experience_level,
+            goal:      goal,                              // ← mapped value, never raw
+            experience:          r.experience_level,
             budget_tier:         p.budget_tier,
-            monthly_food_budget: profile.raw.monthly_food_budget,
-            equipment:            profile.raw.equipment,
-            health_conditions:    profile.raw.conditions?.filter(c => c !== "None") ?? [],
-            dietary_restrictions: profile.raw.diet_restrictions?.filter(d => d !== "None") ?? [],
-            meals_per_day:        profile.raw.meals_per_day ?? 3,
-            cooking_time_mins:    profile.raw.cooking_time_mins ?? 30,
+            monthly_food_budget: r.monthly_food_budget,
+            equipment:            r.equipment,
+            health_conditions:    r.conditions?.filter(c => c !== "None") ?? [],
+            dietary_restrictions: r.diet_restrictions?.filter(d => d !== "None") ?? [],
+            meals_per_day:        r.meals_per_day ?? 3,
+            cooking_time_mins:    r.cooking_time_mins ?? 30,
           },
         }),
       });
 
-      // if (!response.ok) {
-      //   const err = await response.json();
-      //   throw new Error(err.detail ?? "Generation failed");
-      // }
-
       if (!response.ok) {
         const err = await response.json();
         const detail = Array.isArray(err.detail)
-        ? err.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join(", ")
-        : JSON.stringify(err.detail);
+          ? err.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join(", ")
+          : JSON.stringify(err.detail);
         throw new Error(detail);
       }
 
       const plan = await response.json();
-      onPlanGenerated(plan);   // hand back up to App.jsx — no router needed
+      onPlanGenerated(plan);
 
     } catch (err) {
       console.error("Plan generation failed:", err);
@@ -99,17 +98,17 @@ export default function PlanResult({ profile, onReset, onPlanGenerated }) {
         <table className="result-table">
           <tbody>
             {[
-              ["Age",               `${profile.raw.age} years`],
-              ["Sex",               profile.raw.sex],
-              ["Height / Weight",   `${profile.raw.height_cm} cm / ${profile.raw.weight_kg} kg`],
+              ["Age",               `${r.age} years`],
+              ["Sex",               r.sex],
+              ["Height / Weight",   `${r.height_cm} cm / ${r.weight_kg} kg`],
               ["Primary goal",      p.goal_label],
-              ["Experience",        profile.raw.experience_level],
-              ["Equipment",         profile.raw.equipment?.replace("_", " ")],
-              ["Training days",     `${profile.raw.training_days_per_week || "not set"} / week`],
-              ["Conditions",        (profile.raw.conditions?.filter(c => c !== "None").join(", ")) || "None"],
-              ["Diet restrictions", (profile.raw.diet_restrictions?.filter(d => d !== "None").join(", ")) || "None"],
-              ["Sleep",             `${profile.raw.sleep_hours} hrs / night`],
-              ["Stress level",      `${profile.raw.stress_level || 5} / 10`],
+              ["Experience",        r.experience_level],
+              ["Equipment",         r.equipment?.replace("_", " ")],
+              ["Training days",     `${r.training_days_per_week || "not set"} / week`],
+              ["Conditions",        (r.conditions?.filter(c => c !== "None").join(", ")) || "None"],
+              ["Diet restrictions", (r.diet_restrictions?.filter(d => d !== "None").join(", ")) || "None"],
+              ["Sleep",             `${r.sleep_hours} hrs / night`],
+              ["Stress level",      `${r.stress_level || 5} / 10`],
             ].map(([k, v]) => (
               <tr key={k}>
                 <td className="result-td-key">{k}</td>
